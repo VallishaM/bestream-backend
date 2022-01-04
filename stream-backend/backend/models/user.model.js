@@ -52,6 +52,14 @@ const userSchema = new Schema(
       required: true,
       unique: false,
     },
+    ownposts: {
+      type: Array,
+      required: true,
+    },
+    homeposts: {
+      type: Array,
+      required: true,
+    },
   },
   {
     timestamps: true,

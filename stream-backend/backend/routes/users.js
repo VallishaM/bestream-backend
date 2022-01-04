@@ -432,6 +432,8 @@ router.route("/login").post(async (req, res) => {
 router.route("/signup").post(async (req, res) => {
   const email = req.body.email
   const firstName = req.body.firstName
+  const ownposts = req.body.ownposts
+  const homeposts = req.body.homeposts
   const lastName = req.body.lastName
   const password = req.body.password
   const username = req.body.username
@@ -478,6 +480,8 @@ router.route("/signup").post(async (req, res) => {
       followers: followers,
       nfollowing: nfollowing,
       nfollowers: nfollowers,
+      ownposts: ownposts,
+      homeposts: homeposts,
     })
 
     await newUser
