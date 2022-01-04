@@ -22,7 +22,161 @@ const transporter = nodemailer.createTransport({
     pass: nodePass,
   },
 })
-
+router.route("/dummy").get(async (req, res) => {
+  var username = req.body.username
+  console.log("username=" + username)
+  await User.find({ username: username })
+    .then((ress) => {
+      console.log(ress[0].followers)
+      res.json({ done: 1 })
+    })
+    .catch((err) => {
+      console.log(err)
+      res.json({ done: 0, error: 1 })
+    })
+})
+router.route("/unfollow").post(async (req, res) => {
+  const from_username = req.body.from_username
+  const to_username = req.body.to_username
+  const token = req.body.token
+  const email = req.body.email
+  var from_array = []
+  var to_array = []
+  var nfrom = 0
+  var nto = 0
+  var flag = true
+  var flag1 = false
+  await Token.find({ email: email }, { _id: 0 }).then((ress) => {
+    if (ress[0].token == token) {
+      flag1 = true
+    } else {
+      return res.json({ done: 0, auth: 1 })
+    }
+  })
+  if (flag1) {
+    await User.find({ username: from_username })
+      .then((ress) => {
+        if (ress.length == 0) {
+          flag = false
+          res.json({ from_username: 1, done: 0 })
+        } else {
+          from_array = ress[0].following
+          nfrom = ress[0].nfollowing
+        }
+      })
+      .catch((err) => {
+        res.json({ done: 0, error: err })
+      })
+    await User.find({ username: to_username })
+      .then((ress) => {
+        if (ress.length == 0) {
+          flag = false
+          res.json({ to_username: 1, done: 0 })
+        } else {
+          to_array = ress[0].followers
+          nto = ress[0].nfollowers
+        }
+      })
+      .catch((err) => {
+        res.json({ done: 0, error: err })
+      })
+    if (flag) {
+      if (to_array.includes(from_username)) {
+        nto -= 1
+        nfrom -= 1
+        from_array = from_array.filter(function (item) {
+          return item !== to_username
+        })
+        to_array = to_array.filter(function (item) {
+          return item !== from_username
+        })
+        await User.updateOne(
+          { username: from_username },
+          { $set: { nfollowing: nfrom, following: from_array } }
+        )
+          .then(async () => {
+            await User.updateOne(
+              { username: to_username },
+              { $set: { nfollowers: nto, followers: to_array } }
+            )
+              .then(() => res.json({ done: 1 }))
+              .catch((err) => res.json({ done: 1, err: err }))
+          })
+          .catch((err) => res.json({ done: 0, err: err }))
+      } else res.json({ done: 0, nofollow: 1 })
+    }
+  }
+})
+router.route("/follow").post(async (req, res) => {
+  const from_username = req.body.from_username
+  const to_username = req.body.to_username
+  const token = req.body.token
+  const email = req.body.email
+  var from_array = []
+  var to_array = []
+  var nfrom = 0
+  var nto = 0
+  var flag = true
+  var flag1 = false
+  await Token.find({ email: email }, { _id: 0 }).then((ress) => {
+    if (ress[0].token == token) {
+      flag1 = true
+    } else {
+      return res.json({ done: 0, auth: 1 })
+    }
+  })
+  if (flag1) {
+    await User.find({ username: from_username })
+      .then((ress) => {
+        if (ress.length == 0) {
+          flag = false
+          res.json({ from_username: 1, done: 0 })
+        } else {
+          from_array = ress[0].following
+          nfrom = ress[0].nfollowing
+        }
+      })
+      .catch((err) => {
+        res.json({ done: 0, error: err })
+      })
+    await User.find({ username: to_username })
+      .then((ress) => {
+        if (ress.length == 0) {
+          flag = false
+          res.json({ to_username: 1, done: 0 })
+        } else {
+          to_array = ress[0].followers
+          nto = ress[0].nfollowers
+        }
+      })
+      .catch((err) => {
+        res.json({ done: 0, error: err })
+      })
+    if (flag) {
+      if (!to_array.includes(from_username)) {
+        nfrom += 1
+        nto += 1
+        to_array.push(from_username)
+        from_array.push(to_username)
+        await User.updateOne(
+          { username: from_username },
+          { $set: { nfollowing: nfrom, following: from_array } }
+        )
+          .then(async () => {
+            await User.updateOne(
+              { username: to_username },
+              { $set: { nfollowers: nto, followers: to_array } }
+            )
+              .then(() => res.json({ done: 1 }))
+              .catch((err) => res.json({ done: 1, err: err }))
+          })
+          .catch((err) => res.json({ done: 0, err: err }))
+      } else res.json({ done: 0, already: 1 })
+    }
+    to_array = []
+    from_array = []
+  }
+})
 router.route("/show").get(async (req, res) => {
   var email = req.query.email
   await User.find({ email: email })
