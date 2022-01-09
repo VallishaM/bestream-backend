@@ -1,6 +1,11 @@
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const path = require("path");
+const crypto = require("crypto");
+const multer = require("multer");
+const { GridFsStorage } = require("multer-gridfs-storage");
+const Grid = require("gridfs-stream");
 
 require("dotenv").config();
 
@@ -17,38 +22,98 @@ mongoose.connect(uri, {
 	useUnifiedTopology: true,
 });
 
+var gfs;
+
 const connection = mongoose.connection;
 connection.once("open", () => {
 	console.log("MongoDB database connection established successfully");
+	gfs = Grid(connection.db, mongoose.mongo);
+	gfs.collection("imageUpload");
+});
+
+let storage = new GridFsStorage({
+	url: uri,
+	file: (req, file) => {
+		return new Promise((resolve, reject) => {
+			const fileInfo = {
+				filename: file.originalname,
+				bucketName: "imageUpload",
+			};
+			resolve(fileInfo);
+		});
+	},
+});
+const upload = multer({ storage });
+
+app.post("/upload", upload.single("upload"), (req, res) => {
+	res.json({ file: req.file });
+});
+
+app.get("/files", (req, res) => {
+	gfs.files.find().toArray((err, files) => {
+		//check if files exist
+		if (!files || files.length == 0) {
+			return res.status(404).json({
+				err: "No files exist",
+			});
+		}
+		// files exist
+		return res.json(files);
+	});
+});
+
+app.get("/files/:filename", (req, res) => {
+	gfs.files.findOne({ filename: req.params.filename }, (err, file) => {
+		//check if files exist
+		if (!file || file.length == 0) {
+			return res.status(404).json({
+				err: "No files exist",
+			});
+		}
+		//file exist
+		return res.json(file);
+	});
+});
+
+app.get("/image/:filename", async (req, res) => {
+	gfs.files.findOne({ filename: req.params.filename }).then((file) => {
+		if (!file || file.length == 0) {
+			return res.status(404).json({
+				err: "No files exist",
+			});
+		}
+		//check if image
+		if (
+			file.contentType === "image/jpeg" ||
+			file.contentType === "image/png"
+		) {
+			//read output to browser
+			const readStream = gfs.createReadStream(file.filename);
+			readStream.pipe(res);
+		} else {
+			res.status(404).json({
+				err: "Not an image",
+			});
+		}
+	});
+});
+
+app.delete("/files/:id", (req, res) => {
+	gfs.remove(
+		{ _id: req.params.id, root: "imageUpload" },
+		(err, gridStore) => {
+			if (err) {
+				return res.status(404).json({ err: err });
+			}
+			res.redirect("/");
+		}
+	);
 });
 
 const usersRouter = require("./routes/users");
 const fileRouter = require("./routes/file-upload-routes");
-// const formalRouter = require("./routes/formal")
-// const informalRouter = require("./routes/informal")
-// const event = require("./routes/event")
-// const bake = require("./routes/bake")
-// const indian = require("./routes/indian")
-// const ginger = require("./routes/ginger")
-// const bake_pre = require("./routes/bake_pre")
-// const indian_pre = require("./routes/indian_pre")
-// const ginger_pre = require("./routes/ginger_pre")
-// const feed = require("./routes/feedback")
-// const rooms = require("./routes/rooms.js")
 
-// app.use("/formal", formalRouter)
-// app.use("/informal", informalRouter)
-// app.use("/event", event)
-// app.use("/bake", bake)
-// app.use("/indian", indian)
-// app.use("/ginger", ginger)
 app.use("/users", usersRouter);
-app.use("/posts", fileRouter);
-// app.use("/bake_pre", bake_pre)
-// app.use("/indian_pre", indian_pre)
-// app.use("/ginger_pre", ginger_pre)
-// app.use("/feedback", feed)
-// app.use("/rooms", rooms)
 
 app.listen(port, () => {
 	console.log(`Server is running on port: ${port}`);
