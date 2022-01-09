@@ -111,7 +111,6 @@ app.delete("/files/:id", (req, res) => {
 });
 
 const usersRouter = require("./routes/users");
-const fileRouter = require("./routes/file-upload-routes");
 
 app.use("/users", usersRouter);
 
